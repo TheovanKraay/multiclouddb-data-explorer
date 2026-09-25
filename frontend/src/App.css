@@ -91,6 +91,8 @@ button:hover:not(:disabled) { background: var(--accent-hi); }
 button:disabled { opacity: 0.5; cursor: not-allowed; }
 button.danger { background: #a1260d; }
 button.danger:hover:not(:disabled) { background: #c42b0e; }
+button.secondary { background: var(--panel-2); border: 1px solid var(--border); color: var(--text); }
+button.secondary:hover:not(:disabled) { background: var(--border); }
 
 .connection-form h2 { font-size: 15px; }
 .identity-note {
@@ -171,6 +173,42 @@ button.danger:hover:not(:disabled) { background: #c42b0e; }
   resize: vertical;
 }
 .dsl-textarea.invalid { border-color: var(--err); }
+
+/* Syntax-highlight overlay: the textarea sits transparent on top of a colored
+   mirror div. Both share identical font metrics so glyphs align exactly. */
+.dsl-textarea.overlayed {
+  position: relative;
+  background: transparent;
+  color: transparent;
+  caret-color: var(--text);
+  z-index: 2;
+}
+.dsl-highlight {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  padding: 8px 10px;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  font-family: "Cascadia Code", "Consolas", monospace;
+  font-size: 13px;
+  line-height: normal;
+  white-space: pre-wrap;
+  word-break: break-word;
+  overflow: auto;
+  pointer-events: none;
+  color: var(--text);
+}
+.tok-string { color: #ce9178; }
+.tok-number { color: #b5cea8; }
+.tok-boolean, .tok-null { color: #569cd6; }
+.tok-param { color: #dcdcaa; }
+.tok-comp { color: #d4d4d4; }
+.tok-function { color: #4ec9b0; }
+.tok-keyword { color: #c586c0; font-weight: 600; }
+.tok-field { color: #9cdcfe; }
+.tok-paren, .tok-comma, .tok-dot { color: #808080; }
+.tok-unknown { color: var(--err); text-decoration: wavy underline; }
 .dsl-suggestions {
   position: absolute;
   z-index: 20;
@@ -198,6 +236,8 @@ button.danger:hover:not(:disabled) { background: #c42b0e; }
 .sug-detail { font-size: 11px; color: var(--muted); }
 .dsl-diagnostic { font-size: 12px; margin-top: 4px; }
 .dsl-diagnostic.error { color: var(--err); }
+.dsl-diagnostic.warn { color: var(--warn); }
+.dsl-diagnostic.warn code { color: var(--warn); margin: 0 4px; }
 .dsl-diagnostic.ok { color: var(--ok); }
 .dsl-params-hint { font-size: 12px; color: var(--muted); margin-top: 6px; }
 .dsl-params-hint code { color: var(--warn); margin-right: 6px; }

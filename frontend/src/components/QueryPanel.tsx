@@ -11,6 +11,7 @@ import { isSupported } from "./CapabilityBadges";
 import { ResultsTable } from "./ResultsTable";
 import { DslEditor } from "./DslEditor";
 import { extractParameters } from "../dsl";
+import { inferFields } from "../schema";
 
 interface Props {
   connectionId: string;
@@ -32,6 +33,28 @@ export function QueryPanel({ connectionId, capabilities }: Props) {
   const [continuation, setContinuation] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [knownFields, setKnownFields] = useState<string[]>([]);
+  const [sampling, setSampling] = useState(false);
+
+  // Sample a handful of documents to infer field paths for autocomplete.
+  const sampleSchema = async () => {
+    if (!database || !collection) return;
+    setSampling(true);
+    setError(null);
+    try {
+      const res = await runQuery({
+        connectionId,
+        database,
+        collection,
+        pageSize: 20,
+      });
+      setKnownFields(inferFields(res.items));
+    } catch (err) {
+      setError(errorMessage(err));
+    } finally {
+      setSampling(false);
+    }
+  };
 
   const execute = async (token?: string | null) => {
     setBusy(true);
@@ -108,7 +131,12 @@ export function QueryPanel({ connectionId, capabilities }: Props) {
       </div>
 
       {mode === "portable" ? (
-        <DslEditor value={expression} onChange={setExpression} disabled={busy} />
+        <DslEditor
+          value={expression}
+          onChange={setExpression}
+          disabled={busy}
+          knownFields={knownFields}
+        />
       ) : (
         <textarea
           className="query-editor"
@@ -156,6 +184,18 @@ export function QueryPanel({ connectionId, capabilities }: Props) {
             Next page →
           </button>
         )}
+        <button
+          className="secondary"
+          disabled={sampling || !database || !collection}
+          onClick={sampleSchema}
+          title="Sample documents to enable field autocomplete"
+        >
+          {sampling
+            ? "Sampling…"
+            : knownFields.length
+              ? `Fields: ${knownFields.length} ↻`
+              : "Sample schema"}
+        </button>
       </div>
 
       {error && <div className="error-banner">{error}</div>}
