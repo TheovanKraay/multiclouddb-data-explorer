@@ -94,6 +94,10 @@ jobs:
         uses: tauri-apps/tauri-action@v0
         with:
           projectPath: frontend
+          # Linux: ship .deb + .rpm only. AppImage bundling fails when a JRE is
+          # embedded (linuxdeploy can't resolve the bundled .so set). deb/rpm
+          # cover the target audience and the install script prefers .deb.
+          args: ${{ matrix.target == 'linux' && '--bundles deb,rpm' || '' }}
           # On a version tag, create/append to a GitHub Release and upload the
           # installers as assets. The install scripts read the 'latest' release.
           tagName: ${{ github.ref_type == 'tag' && github.ref_name || '' }}
@@ -114,5 +118,4 @@ jobs:
             frontend/src-tauri/target/release/bundle/**/*.exe
             frontend/src-tauri/target/release/bundle/**/*.dmg
             frontend/src-tauri/target/release/bundle/**/*.deb
-            frontend/src-tauri/target/release/bundle/**/*.AppImage
             frontend/src-tauri/target/release/bundle/**/*.rpm
