@@ -1,8 +1,0 @@
-com/microsoft/multiclouddb/explorer/sidecar/ClientFactory.class
-com/microsoft/multiclouddb/explorer/sidecar/SidecarMain.class
-com/microsoft/multiclouddb/explorer/sidecar/SidecarServer$ThrowingHandler.class
-com/microsoft/multiclouddb/explorer/sidecar/ConnectionRegistry$Entry.class
-com/microsoft/multiclouddb/explorer/sidecar/ConnectionRegistry.class
-com/microsoft/multiclouddb/explorer/sidecar/ConnectionSpec.class
-com/microsoft/multiclouddb/explorer/sidecar/SidecarServer.class
-com/microsoft/multiclouddb/explorer/sidecar/ProviderCatalog.class
