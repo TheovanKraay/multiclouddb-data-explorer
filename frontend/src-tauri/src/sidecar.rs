@@ -109,7 +109,7 @@ pub fn spawn_sidecar(app: &tauri::AppHandle, state: &SidecarState) -> Result<(),
         .arg("--port")
         .arg("0")
         .stdout(Stdio::piped())
-        .stderr(Stdio::inherit())
+        .stderr(Stdio::piped())
         .spawn()
         .map_err(|e| {
             if e.kind() == std::io::ErrorKind::NotFound {
@@ -121,6 +121,25 @@ pub fn spawn_sidecar(app: &tauri::AppHandle, state: &SidecarState) -> Result<(),
                 format!("Failed to launch Java sidecar ({java}): {e}")
             }
         })?;
+
+    // Drain stderr on a background thread so we can report the crash reason if
+    // the process dies before the handshake (e.g. a missing JRE module).
+    let stderr = child.stderr.take();
+    let stderr_buf = std::sync::Arc::new(Mutex::new(String::new()));
+    if let Some(err) = stderr {
+        let buf = stderr_buf.clone();
+        std::thread::spawn(move || {
+            let mut reader = BufReader::new(err);
+            let mut line = String::new();
+            while reader.read_line(&mut line).unwrap_or(0) > 0 {
+                let mut g = buf.lock().unwrap();
+                if g.len() < 4000 {
+                    g.push_str(&line);
+                }
+                line.clear();
+            }
+        });
+    }
 
     let stdout = child
         .stdout
@@ -136,7 +155,23 @@ pub fn spawn_sidecar(app: &tauri::AppHandle, state: &SidecarState) -> Result<(),
             .read_line(&mut line)
             .map_err(|e| format!("reading sidecar stdout: {e}"))?;
         if n == 0 {
-            return Err("sidecar exited before handshake".to_string());
+            // Give the stderr drainer a moment, then surface what it captured.
+            std::thread::sleep(std::time::Duration::from_millis(200));
+            let captured = stderr_buf.lock().unwrap().trim().to_string();
+            let detail = captured
+                .lines()
+                .rev()
+                .take(6)
+                .collect::<Vec<_>>()
+                .into_iter()
+                .rev()
+                .collect::<Vec<_>>()
+                .join("\n");
+            return Err(if detail.is_empty() {
+                "sidecar exited before handshake (no output captured)".to_string()
+            } else {
+                format!("sidecar exited before handshake:\n{detail}")
+            });
         }
         if let Some(rest) = line.trim().strip_prefix("SIDECAR_READY ") {
             let mut parts = rest.split_whitespace();

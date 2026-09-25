@@ -55,20 +55,31 @@ jobs:
         shell: bash
         run: |
           rm -rf frontend/src-tauri/runtime
-          # Determine modules the sidecar needs; fall back to a broad safe set.
-          MODS=$(jdeps --print-module-deps --ignore-missing-deps --multi-release 17 \
+          # jdeps can't see reflection/service-loaded dependencies (Jackson,
+          # cloud SDKs, TLS, etc.), so we union its result with a comprehensive
+          # safe set rather than trusting auto-detection alone. A too-small JRE
+          # makes the sidecar crash on startup ('exited before handshake').
+          BASE="java.base,java.logging,java.naming,java.net.http,java.sql,java.xml,java.desktop,java.management,java.security.jgss,java.security.sasl,java.instrument,java.compiler,java.transaction.xa,java.rmi,java.scripting,jdk.crypto.ec,jdk.crypto.cryptoki,jdk.httpserver,jdk.unsupported,jdk.management,jdk.naming.dns,jdk.zipfs,jdk.jdwp.agent"
+          DETECTED=$(jdeps --print-module-deps --ignore-missing-deps --multi-release 17 \
             sidecar/target/multiclouddb-explorer-sidecar.jar 2>/dev/null || true)
-          if [ -z "$MODS" ]; then
-            MODS="java.base,java.logging,java.naming,java.net.http,java.sql,java.xml,jdk.crypto.ec,java.security.jgss,java.management,java.desktop"
-          else
-            # Ensure TLS + common runtime modules are present.
-            MODS="$MODS,jdk.crypto.ec,java.net.http"
-          fi
+          MODS=$(printf '%s,%s' "$BASE" "$DETECTED" | tr ',' '\n' | sed '/^$/d' | sort -u | paste -sd, -)
           echo "jlink modules: $MODS"
           jlink --no-header-files --no-man-pages --strip-debug --compress=2 \
             --add-modules "$MODS" \
             --output frontend/src-tauri/runtime
           frontend/src-tauri/runtime/bin/java -version
+          # Smoke-test: the sidecar must reach its handshake under this JRE.
+          echo "Smoke-testing sidecar under bundled JRE..."
+          timeout 30 frontend/src-tauri/runtime/bin/java -jar \
+            sidecar/target/multiclouddb-explorer-sidecar.jar --port 0 > sc.log 2>&1 &
+          SC=$!
+          for i in $(seq 1 25); do
+            if grep -q 'SIDECAR_READY' sc.log 2>/dev/null; then echo "handshake OK"; break; fi
+            if ! kill -0 $SC 2>/dev/null; then echo "SIDECAR CRASHED:"; cat sc.log; exit 1; fi
+            sleep 1
+          done
+          grep -q 'SIDECAR_READY' sc.log || { echo "NO HANDSHAKE:"; cat sc.log; kill $SC 2>/dev/null; exit 1; }
+          kill $SC 2>/dev/null || true
 
       # --- Node: build the frontend ---
       - name: Set up Node
