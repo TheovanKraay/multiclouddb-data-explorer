@@ -50,7 +50,11 @@ async function call<T>(path: string, body: unknown): Promise<T> {
   return invoke<T>("sidecar_request", { req: { path, body } });
 }
 
-export async function sidecarInfo(): Promise<{ port: number; ready: boolean }> {
+export async function sidecarInfo(): Promise<{
+  port: number;
+  ready: boolean;
+  error?: string | null;
+}> {
   return invoke("sidecar_info");
 }
 

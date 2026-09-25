@@ -6,3 +6,6 @@ src-tauri/target/
 # Java build output
 sidecar/target/
 *.jar
+
+# Bundled JRE (built by CI via jlink)
+frontend/src-tauri/runtime/

@@ -33,8 +33,3 @@ if ($out -like '*.msi') {
 }
 
 Write-Host "==> Done." -ForegroundColor Blue
-
-# Runtime prerequisite reminder.
-if (-not (Get-Command java -ErrorAction SilentlyContinue)) {
-  Write-Warning "Java 17+ was not found on your PATH. The app needs a JRE to run: https://adoptium.net/"
-}

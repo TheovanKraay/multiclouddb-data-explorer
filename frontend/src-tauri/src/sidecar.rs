@@ -21,6 +21,8 @@ use tauri::{Manager, State};
 #[derive(Default)]
 pub struct SidecarState {
     inner: Mutex<Option<SidecarHandle>>,
+    /// Last startup error, if the sidecar failed to launch. Surfaced to the UI.
+    error: Mutex<Option<String>>,
 }
 
 struct SidecarHandle {
@@ -35,6 +37,8 @@ struct SidecarHandle {
 pub struct SidecarInfo {
     port: u16,
     ready: bool,
+    /// Populated when the sidecar failed to start, so the UI can explain why.
+    error: Option<String>,
 }
 
 #[derive(Deserialize)]
@@ -43,6 +47,26 @@ pub struct SidecarRequest {
     path: String,
     /// JSON body forwarded verbatim.
     body: serde_json::Value,
+}
+
+/// Resolve the Java executable to run the sidecar with. Preference order:
+///  1. `MULTICLOUDDB_JAVA` env override.
+///  2. A JRE bundled next to the app resources (`<resources>/runtime/bin/java`).
+///     This removes the need for the user to have Java installed and avoids the
+///     GUI-app PATH problem (launchers often don't inherit the shell PATH).
+///  3. Bare `java` on PATH as a last resort.
+fn locate_java(app: &tauri::AppHandle) -> String {
+    if let Ok(java) = std::env::var("MULTICLOUDDB_JAVA") {
+        return java;
+    }
+    if let Ok(resource_dir) = app.path().resource_dir() {
+        let exe = if cfg!(windows) { "java.exe" } else { "java" };
+        let bundled = resource_dir.join("runtime").join("bin").join(exe);
+        if bundled.exists() {
+            return bundled.to_string_lossy().into_owned();
+        }
+    }
+    "java".to_string()
 }
 
 /// Locate the bundled sidecar jar. In dev we resolve it relative to the repo;
@@ -77,7 +101,7 @@ fn locate_sidecar(app: &tauri::AppHandle) -> Result<PathBuf, String> {
 /// Spawn the Java sidecar and block until the handshake line arrives.
 pub fn spawn_sidecar(app: &tauri::AppHandle, state: &SidecarState) -> Result<(), String> {
     let jar = locate_sidecar(app)?;
-    let java = std::env::var("MULTICLOUDDB_JAVA").unwrap_or_else(|_| "java".to_string());
+    let java = locate_java(app);
 
     let mut child = Command::new(&java)
         .arg("-jar")
@@ -87,7 +111,16 @@ pub fn spawn_sidecar(app: &tauri::AppHandle, state: &SidecarState) -> Result<(),
         .stdout(Stdio::piped())
         .stderr(Stdio::inherit())
         .spawn()
-        .map_err(|e| format!("Failed to launch Java sidecar ({java}): {e}"))?;
+        .map_err(|e| {
+            if e.kind() == std::io::ErrorKind::NotFound {
+                format!(
+                    "Java runtime not found (tried '{java}'). Install Java 17+ \
+                     (https://adoptium.net/) or reinstall the app with the bundled runtime."
+                )
+            } else {
+                format!("Failed to launch Java sidecar ({java}): {e}")
+            }
+        })?;
 
     let stdout = child
         .stdout
@@ -128,16 +161,31 @@ pub fn spawn_sidecar(app: &tauri::AppHandle, state: &SidecarState) -> Result<(),
     Err("did not observe SIDECAR_READY handshake".to_string())
 }
 
+/// Spawn the sidecar and record any failure into shared state for the UI.
+pub fn spawn_and_record(app: &tauri::AppHandle, state: &SidecarState) {
+    match spawn_sidecar(app, state) {
+        Ok(()) => {
+            *state.error.lock().unwrap() = None;
+        }
+        Err(e) => {
+            eprintln!("sidecar startup failed: {e}");
+            *state.error.lock().unwrap() = Some(e);
+        }
+    }
+}
+
 #[tauri::command]
 pub fn sidecar_info(state: State<'_, SidecarState>) -> SidecarInfo {
     match &*state.inner.lock().unwrap() {
         Some(h) => SidecarInfo {
             port: h.port,
             ready: true,
+            error: None,
         },
         None => SidecarInfo {
             port: 0,
             ready: false,
+            error: state.error.lock().unwrap().clone(),
         },
     }
 }

@@ -17,7 +17,7 @@ curl -fsSL https://raw.githubusercontent.com/TheovanKraay/multiclouddb-data-expl
 irm https://raw.githubusercontent.com/TheovanKraay/multiclouddb-data-explorer/main/install.ps1 | iex
 ```
 
-> Requires **Java 17+** on your `PATH` ([download](https://adoptium.net/)).
+No prerequisites — a Java runtime is bundled with the app.
 
 ## Use
 

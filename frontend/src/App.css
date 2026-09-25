@@ -115,6 +115,7 @@ button.secondary:hover:not(:disabled) { background: var(--border); }
   margin: 10px 0;
 }
 .error-banner.global { margin: 0 20px; margin-top: 12px; }
+.sidecar-error-detail { font-size: 12px; margin-top: 6px; font-weight: normal; opacity: 0.9; }
 .status-banner {
   background: rgba(78, 201, 176, 0.12);
   border: 1px solid var(--ok);

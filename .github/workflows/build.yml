@@ -50,6 +50,26 @@ jobs:
         working-directory: sidecar
         run: mvn -B -DskipTests package
 
+      # --- Create a trimmed JRE with jlink so users don't need Java installed ---
+      - name: Build bundled JRE (jlink)
+        shell: bash
+        run: |
+          rm -rf frontend/src-tauri/runtime
+          # Determine modules the sidecar needs; fall back to a broad safe set.
+          MODS=$(jdeps --print-module-deps --ignore-missing-deps --multi-release 17 \
+            sidecar/target/multiclouddb-explorer-sidecar.jar 2>/dev/null || true)
+          if [ -z "$MODS" ]; then
+            MODS="java.base,java.logging,java.naming,java.net.http,java.sql,java.xml,jdk.crypto.ec,java.security.jgss,java.management,java.desktop"
+          else
+            # Ensure TLS + common runtime modules are present.
+            MODS="$MODS,jdk.crypto.ec,java.net.http"
+          fi
+          echo "jlink modules: $MODS"
+          jlink --no-header-files --no-man-pages --strip-debug --compress=2 \
+            --add-modules "$MODS" \
+            --output frontend/src-tauri/runtime
+          frontend/src-tauri/runtime/bin/java -version
+
       # --- Node: build the frontend ---
       - name: Set up Node
         uses: actions/setup-node@v4

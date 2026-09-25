@@ -19,13 +19,11 @@ pub fn run() {
                 )?;
             }
             // Launch the Java sidecar and wait for its handshake before the UI
-            // starts making calls. A failure here is fatal — surface it clearly.
+            // starts making calls. Any failure is recorded into shared state and
+            // surfaced to the UI (rather than crashing or failing silently).
             let handle = app.handle().clone();
             let state = app.state::<SidecarState>();
-            if let Err(e) = sidecar::spawn_sidecar(&handle, &state) {
-                log::error!("sidecar startup failed: {e}");
-                eprintln!("FATAL: sidecar startup failed: {e}");
-            }
+            sidecar::spawn_and_record(&handle, &state);
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![

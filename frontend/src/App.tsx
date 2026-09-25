@@ -14,12 +14,16 @@ type Tab = "query" | "document";
 
 function App() {
   const [ready, setReady] = useState<boolean | null>(null);
+  const [sidecarError, setSidecarError] = useState<string | null>(null);
   const [conn, setConn] = useState<ConnectResult | null>(null);
   const [tab, setTab] = useState<Tab>("query");
 
   useEffect(() => {
     sidecarInfo()
-      .then((info) => setReady(info.ready))
+      .then((info) => {
+        setReady(info.ready);
+        setSidecarError(info.error ?? null);
+      })
       .catch(() => setReady(false));
   }, []);
 
@@ -50,7 +54,14 @@ function App() {
 
       {ready === false && (
         <div className="error-banner global">
-          Backend sidecar is not running. Restart the application.
+          <strong>Backend sidecar is not running.</strong>
+          {sidecarError ? (
+            <div className="sidecar-error-detail">{sidecarError}</div>
+          ) : (
+            <div className="sidecar-error-detail">
+              Restart the application. If this persists, ensure Java 17+ is installed.
+            </div>
+          )}
         </div>
       )}
 

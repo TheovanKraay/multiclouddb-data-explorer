@@ -93,8 +93,3 @@ case "$OS" in
     die "Unsupported OS '$OS'. On Windows, use install.ps1 instead."
     ;;
 esac
-
-# Runtime prerequisite reminder.
-if ! command -v java >/dev/null 2>&1; then
-  warn "Java 17+ was not found on your PATH. The app needs a JRE to run: https://adoptium.net/"
-fi
